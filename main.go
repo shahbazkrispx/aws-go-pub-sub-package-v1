@@ -1,15 +1,42 @@
-package services
+package main
 
 import (
 	"errors"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/sqs"
 	"os"
+
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/sns"
+	"github.com/aws/aws-sdk-go/service/sqs"
+	"github.com/shahbazkrispx/aws-go-pub-sub-package-v1/services"
 )
 
-func SendToSQS(queueUrl string, message string, messageAttr map[string]*sqs.MessageAttributeValue)  {
-	session, err := BuildSession()
+func main() {
+	fmt.Println("PUB/SUB")
+}
+
+func SendToSNS(topicARn string, message string, messageAttr map[string]*sns.MessageAttributeValue) {
+
+	session, err := services.BuildSession()
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	svc := sns.New(session)
+
+	pubMessage := &sns.PublishInput{
+		MessageAttributes: messageAttr,
+		Message:           aws.String(message),
+		TopicArn:          aws.String(topicARn),
+	}
+	_, err = svc.Publish(pubMessage)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+}
+
+func SendToSQS(queueUrl string, message string, messageAttr map[string]*sqs.MessageAttributeValue) {
+	session, err := services.BuildSession()
 	if err != nil {
 		fmt.Println(err.Error())
 	}
@@ -18,8 +45,8 @@ func SendToSQS(queueUrl string, message string, messageAttr map[string]*sqs.Mess
 
 	sendInput := &sqs.SendMessageInput{
 		MessageAttributes: messageAttr,
-		MessageBody: aws.String(message),
-		QueueUrl:    aws.String(queueUrl),
+		MessageBody:       aws.String(message),
+		QueueUrl:          aws.String(queueUrl),
 	}
 
 	_, er := svc.SendMessage(sendInput)
@@ -29,11 +56,8 @@ func SendToSQS(queueUrl string, message string, messageAttr map[string]*sqs.Mess
 	}
 }
 
-
-
-
-func SubscribeSQS(queueUrl string, cancel <-chan os.Signal) ([]*sqs.Message, error)  {
-	awsSession, err := BuildSession()
+func SubscribeSQS(queueUrl string, cancel <-chan os.Signal) ([]*sqs.Message, error) {
+	awsSession, err := services.BuildSession()
 	if err != nil {
 		fmt.Println(err.Error())
 	}
@@ -51,7 +75,6 @@ func SubscribeSQS(queueUrl string, cancel <-chan os.Signal) ([]*sqs.Message, err
 	//}
 	return messages, nil
 }
-
 
 func receiveMessages(svc *sqs.SQS, queueUrl string) ([]*sqs.Message, error) {
 
@@ -81,7 +104,6 @@ func receiveMessages(svc *sqs.SQS, queueUrl string) ([]*sqs.Message, error) {
 
 	return receiveMessageOutput.Messages, nil
 }
-
 
 func DeleteMessage(svc *sqs.SQS, queueUrl string, handle *string) {
 	delInput := &sqs.DeleteMessageInput{
